@@ -1,13 +1,22 @@
 import ballerina/http;
 import ballerina/io;
 
-configurable int port = 8080;
+configurable int port = 8000;
+configurable string certFile = ?;
+configurable string keyFile = ?;
 
-listener http:Listener httpListener = new (port);
+listener http:Listener httpListener = new (port,
+    secureSocket = {
+        key: {
+            certFile,
+            keyFile
+        }
+    }
+);
 
 service http:InterceptableService on httpListener {
     public function createInterceptors() returns http:Interceptor|http:Interceptor[] {
-        return [new InternalErrorInterceptor(), new ResponseInterceptor()];
+        return [new InternalErrorInterceptor()];
     }
 
     isolated function init() {
@@ -16,46 +25,40 @@ service http:InterceptableService on httpListener {
         io:println(string `Server started on ${protocol}://${httpListener.getConfig().host}:${port}`);
     }
 
-    resource function get .() returns string|InternalError {
-        return getIndex();
+    resource function get .() returns Ok|InternalError {
+        string body = check getIndex();
+        return {
+            body
+        };
     }
 
-    resource function get favicon\.ico() returns http:Response|error {
-        byte[] favicon = check getFavicon();
-        http:Response response = new;
-        response.setBinaryPayload(favicon, "image/x-icon");
-        return response;
+    resource function get favicon\.ico() returns Ok|error {
+        byte[] body = check getFavicon();
+        return {
+            body,
+            mediaType: extensionToContentType.get("ico")
+        };
     }
 
-    resource function get [string project]/favicon\.ico() returns http:Response|error {
-        byte[] favicon = check getFavicon(project);
-        http:Response response = new;
-        response.setBinaryPayload(favicon, "image/x-icon");
-        return response;
-    }
-
-    resource function get [string project]() returns string|Error {
+    resource function get [string project]() returns Ok|Error {
         if !isValidProject(project) {
             return error NotFoundError("Project not found");
         }
-        return readStringContent(project, "");
+        Content content = check getFileContent(project, "");
+        return {
+            ...content
+        };
     }
 
-    resource function get [string project]/[string... paths]() returns http:Response|Error {
+    resource function get [string project]/[string... paths]() returns Ok|Error {
         if !isValidProject(project) {
             return error NotFoundError("Project not found");
         }
         string path = check sanitizePath(paths);
-        string extension = getFileExtension(path);
-        http:Response response = new;
-        if extension is ImageExtension {
-            byte[] imageContent = check readImageContent(project, path);
-            response.setBinaryPayload(imageContent, IMAGE);
-        } else {
-            string fileContent = check readStringContent(project, path);
-            response.setTextPayload(fileContent, HTML);
-        }
-        return response;
+        Content content = check getFileContent(project, path);
+        return {
+            ...content
+        };
     }
 }
 
@@ -86,14 +89,5 @@ service class InternalErrorInterceptor {
                 body: "Bad request"
             };
         }
-    }
-}
-
-service class ResponseInterceptor {
-    *http:ResponseInterceptor;
-
-    remote function interceptResponse(http:RequestContext ctx, http:Response res) returns http:NextService|error? {
-        res.setHeader("Content-Type", "text/html");
-        return ctx.next();
     }
 }

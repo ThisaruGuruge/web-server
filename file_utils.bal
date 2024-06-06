@@ -4,7 +4,7 @@ import ballerina/log;
 
 const BASE_PATH = "./public";
 
-const string[] PATH_APPENDS = ["", ".html", ".php", "index.html", "index.php"];
+const string[] PATH_APPENDS = ["", ".html", ".php", "/index.html", "/index.php"];
 
 isolated function isValidProject(string project) returns boolean {
     string projectPath = string `${BASE_PATH}/${project}`;
@@ -15,27 +15,47 @@ isolated function isValidProject(string project) returns boolean {
     return true;
 }
 
-function readStringContent(string project, string path) returns string|Error {
+function getFileContent(string project, string path) returns Content|Error {
     foreach string suffix in PATH_APPENDS {
         string filePath = string `${BASE_PATH}/${project}/${path}${suffix}`;
         if check isValidFile(filePath) {
-            string|error fileContent = io:fileReadString(filePath);
-            if fileContent is error {
-                log:printError(string `Failed to read the file "${filePath}"`, fileContent);
-                return error InternalError(string `Internal server error`);
-            }
-            return fileContent;
+            return readFileContent(filePath);
         }
     }
     log:printError(string `File not found: ${path}`, error NotFoundError(string `File not found: ${path}`));
     return error NotFoundError("Requested file not found");
 }
 
-isolated function readImageContent(string project, string filePath) returns byte[]|InternalError {
-    string imagePath = string `${BASE_PATH}/${project}/${filePath}`;
-    byte[]|error fileContent = io:fileReadBytes(imagePath);
+isolated function readFileContent(string path) returns Content|Error {
+    string extension = getFileExtension(path);
+    string mediaType = extensionToContentType.hasKey(extension) ? extensionToContentType.get(extension) : "text/plain";
+    if extension is ImageExtension {
+        byte[] body = check readImageContent(path);
+        return {
+            body,
+            mediaType
+        };
+    }
+    string body = check readStringContentNew(path);
+    return {
+        body,
+        mediaType
+    };
+}
+
+isolated function readStringContentNew(string path) returns string|Error {
+    string|error fileContent = io:fileReadString(path);
     if fileContent is error {
-        log:printError(string `Failed to read the file "${imagePath}"`, fileContent);
+        log:printError(string `Failed to read the file "${path}"`, fileContent);
+        return error InternalError(string `Internal server error`);
+    }
+    return fileContent;
+}
+
+isolated function readImageContent(string path) returns byte[]|InternalError {
+    byte[]|error fileContent = io:fileReadBytes(path);
+    if fileContent is error {
+        log:printError(string `Failed to read the file "${path}"`, fileContent);
         return error InternalError(string `Internal server error`);
     }
     return fileContent;

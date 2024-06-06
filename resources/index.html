@@ -1,16 +1,46 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="./resource/styles.css">
     <title>Web Server</title>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            body {
+                background-color: #333;
+                color: #fff;
+            }
+
+            a, a:visited {
+                color: #fff;
+            }
+            a:hover, a:active {
+                color: #f00;
+            }
+        }
+
+        ul {
+            list-style-type: circle;
+            padding: 2rem;
+            font-size: 1.4rem;
+        }
+
+        h1 {
+            text-align: center;
+            margin-top: 2rem;
+        }
+    </style>
 </head>
+
 <body>
     <h1>Welcome to WebServer</h1>
     <section>
         <ul>
-@@list@@
+            @@list@@
         </ul>
     </section>
 </body>
+
 </html>

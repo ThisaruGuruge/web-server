@@ -11,3 +11,4 @@ generated/
 Config.toml
 
 public
+resources/certs
